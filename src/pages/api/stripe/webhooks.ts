@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { Readable } from 'stream';
 import Stripe from "stripe";
 import { stripe } from "../../../services/stripe";
+import { saveSubscription } from "../_lib/manageSubscription";
 
 async function buffer(readable: Readable) {
     const chunck = [];
@@ -22,7 +23,10 @@ export const config = {
 }
 
 const relevantEvents = new Set([
-    'checkout.session.completed'
+    'checkout.session.completed',
+    'customer.subscription.created',
+    'customer.subscription.updated',
+    'customer.subscription.deleted',
 ]);
 
 export default async (req: NextApiRequest, res: NextApiResponse) => {
@@ -43,14 +47,34 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
         if (relevantEvents.has(type)) {
             try {
                 switch (type) {
+                    case 'customer.subscription.created':
+                    case 'customer.subscription.updated':
+                    case 'customer.subscription.deleted':
+                        const subscription = event.data.object as Stripe.Subscription;
+
+                        await saveSubscription(
+                            subscription.id,
+                            subscription.customer.toString(),
+                            type === 'customer.subscription.created'
+                        );
+
+                        break;
                     case 'checkout.session.completed':
-                        // Salvar na base de dados o pagamento concluído
+                        const checkoutSession = event.data.object as Stripe.Checkout.Session
+
+                        await saveSubscription(
+                            checkoutSession.subscription.toString(),
+                            checkoutSession.customer.toString(),
+                            true
+                        );
+
                         break;
                     default:
                         throw new Error('Unhandled event.');
                 }
             } catch (err) {
-                return res.status(500).json({error: 'Webhook handler failed.'});
+                // Avisar o admin atraves de um sentry ou bugsnag
+                return res.status(200).json({error: 'Webhook handler failed.'});
             }
         }
 
