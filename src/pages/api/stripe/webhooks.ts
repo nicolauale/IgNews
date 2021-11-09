@@ -5,15 +5,15 @@ import { stripe } from "../../../services/stripe";
 import { saveSubscription } from "../_lib/manageSubscription";
 
 async function buffer(readable: Readable) {
-    const chunck = [];
+    const chuncks = [];
 
     for await (const chunck of readable) {
-        chunck.push(
+        chuncks.push(
             typeof chunck === "string" ? Buffer.from(chunck) : chunck
         );
     }
 
-    return Buffer.concat(chunck);
+    return Buffer.concat(chuncks);
 }
 
 export const config = {
