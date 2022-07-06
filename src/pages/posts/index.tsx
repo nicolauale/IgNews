@@ -1,12 +1,13 @@
 import { GetStaticProps } from 'next';
 import Link from 'next/link';
-import Prismic from '@prismicio/client';
-import { RichText } from 'prismic-dom';
+import { useSession } from "next-auth/client";
 
+import Prismic from '@prismicio/client';
 import { getPrismicClient } from '../../services/prismic';
 
 import Head from 'next/head';
 import styles from './styles.module.scss';
+import { RichText } from 'prismic-dom';
 
 type Post = {
     slug: string;
@@ -20,6 +21,8 @@ interface PostsProps {
 }
 
 export default function Posts({ posts }: PostsProps) {
+    const [session] = useSession();
+
     return (
         <>
             <Head>
@@ -29,13 +32,22 @@ export default function Posts({ posts }: PostsProps) {
             <main className={styles.container}>
                 <div className={styles.posts}>
                     {posts.map((post) => (
-                        <Link href={`/posts/${post.slug}`} key={post.slug}>
-                            <a>
-                                <time>{ post.updatedAt }</time>
-                                <strong>{ post.title }</strong>
-                                <p>{ post.excerpt }</p>
-                            </a>
-                        </Link>
+                        session?.activeSubscription ?
+                            <Link href={`/posts/${post.slug}`} key={post.slug}>
+                                <a>
+                                    <time>{post.updatedAt}</time>
+                                    <strong>{post.title}</strong>
+                                    <p>{post.excerpt}</p>
+                                </a>
+                            </Link>
+                            :
+                            <Link href={`/posts/preview/${post.slug}`} key={post.slug}>
+                                <a>
+                                    <time>{post.updatedAt}</time>
+                                    <strong>{post.title}</strong>
+                                    <p>{post.excerpt}</p>
+                                </a>
+                            </Link>
                     ))}
                 </div>
             </main>
@@ -47,9 +59,9 @@ export const getStaticProps: GetStaticProps = async () => {
     const prismic = getPrismicClient();
 
     const response = await prismic.query(
-        Prismic.Predicates.at('document.type', 'po'), 
+        Prismic.Predicates.at('document.type', 'po'),
         {
-            orderings : '[my.post.date desc]',
+            orderings: '[my.post.date desc]',
             fetch: ['post.title', 'post.content'],
             pageSize: 100,
         }
